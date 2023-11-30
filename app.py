@@ -1,21 +1,3 @@
-<<<<<<< HEAD
-from flask import Flask, render_template, url_for
-
-from flask_login import UserMixin
-
-from flask_sqlalchemy import *
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI']='postgresql://cs4800admin:password@musicrecommender-db.cqcweq8o7ffq.us-east-2.rds.amazonaws.com/postgres'
-db = SQLAlchemy(app)
-
-
-
-
-@app.route('/')
-def home():
-    return render_template('home.html')
-=======
 from flask import Flask, request, redirect, render_template, url_for
 from flask_mysqldb import MySQL
 from user import User
@@ -43,7 +25,6 @@ def home():
     return render_template('home.html')
 
 @app.route('/')
->>>>>>> main
 @app.route('/login')
 def login():
     return render_template('login.html')
@@ -52,8 +33,6 @@ def login():
 def register():
     return render_template('register.html')
 
-<<<<<<< HEAD
-=======
 #POST method means expecting data back from user
 @app.route('/register', methods=['POST'])
 def signup_user():
@@ -83,7 +62,6 @@ def loginUser():
     else:
         #not registered, stay on login page
         return redirect(url_for('login'))
->>>>>>> main
 
 if __name__=='__main__':
     app.run(debug=True)

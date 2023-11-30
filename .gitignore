@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-__pycache__
-
-.venv/
-=======
 **cache/temp_files**
 __pycache__
 tempCodeRunnerFile.py
 
 **virtual environment**
 .venv
->>>>>>> main

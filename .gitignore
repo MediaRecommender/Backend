@@ -1,6 +1,6 @@
-### Gradle ###
-build/
-.gradle
+**cache/temp_files**
+__pycache__
+tempCodeRunnerFile.py
 
-### Eclipse ###
-.project
+**virtual environment**
+.venv

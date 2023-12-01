@@ -35,7 +35,7 @@ def register():
 
 #POST method means expecting data back from user
 @app.route('/register', methods=['POST'])
-def signup_user():
+def signupUser():
     #use request.form.get to grab user data from register html page
     email=request.form.get('email')
     name=request.form.get('name')

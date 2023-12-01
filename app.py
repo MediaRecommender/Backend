@@ -2,6 +2,8 @@ from flask import Flask, request, redirect, render_template, url_for
 from flask_mysqldb import MySQL
 from user import User
 import db
+import openai
+openai.api_key = "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"
 
 app = Flask(__name__)
 
@@ -62,6 +64,20 @@ def loginUser():
     else:
         #not registered, stay on login page
         return redirect(url_for('login'))
+    
+def recommendedMusic(song1, song2, song3, song4, song5):
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a music recommender system that will " +
+            "return 5 similar songs along with their respective artist names and cover art jpeg" +
+            "links in the form of a python dictionary when given a couple of song names"},
+            {"role": "user", "content": "return 5 similar songs along with their respective artist " +
+             "names and cover art jpeg links for the songs in the form of a python dictionary: {}, {}, {}, {}, {}".format(song1,song2,song3,song4,song5)}
+        ]
+    )
+    print(response.choices[0].message)
+    return response.choices[0].message
 
 if __name__=='__main__':
     app.run(debug=True)

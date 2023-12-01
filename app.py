@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, render_template, url_for
+from flask import Flask, request, redirect, render_template, url_for, jsonify 
 from flask_mysqldb import MySQL
 from user import User
 import db
@@ -36,15 +36,24 @@ def register():
 #POST method means expecting data back from user
 @app.route('/register', methods=['POST'])
 def signup_user():
-    #create new user instance. use request.form.get to grab user data from register html page
-    newUser = User(
-        email=request.form.get('email'),
-        name=request.form.get('name'),
-        password=request.form.get('password'),
-    )
+    #use request.form.get to grab user data from register html page
+    email=request.form.get('email')
+    name=request.form.get('name')
+    password=request.form.get('password')
+
+    #create new user instance
+    newUser = User(email, name,password)
     #call user method to insert user into db
     newUser.insertUser()
-    return redirect(url_for('home'))
+
+    #return json package of user info 
+    return jsonify({
+        'success': True, 
+        'userEmail': email,  
+        'userName':name, 
+        'userPassword': password
+        })
+    #return redirect(url_for('home'))
 
 @app.route('/login', methods=['POST'])
 def loginUser():
@@ -58,10 +67,18 @@ def loginUser():
     #call db validating method to see if user is registered
     if db.validateUser(email, password):
         #registered user, go to home page
-        return redirect(url_for('home'))
+        return jsonify({
+            'success': True, 
+            'message': 'Welcome!'
+            })
+        #redirect(url_for('home'))
     else:
         #not registered, stay on login page
-        return redirect(url_for('login'))
+        return jsonify({
+            'success': False, 
+            'message': 'Invalid email or password!'
+            })
+        #return redirect(url_for('login'))
 
 if __name__=='__main__':
     app.run(debug=True)

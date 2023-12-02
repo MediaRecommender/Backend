@@ -24,23 +24,23 @@ def indexFunction():
 
     return results
 
-def validateUser(email,password):
+def validateUser(username,password):
     #establish connection to db
     connection = connectDB().connection
     cursor = connection.cursor()
     
-    #execute query to select password belonging to email user entered, if it is a registered email
-    cursor.execute('SELECT password FROM users WHERE email LIKE %s', [email])
+    #execute query to select password belonging to username user entered, if it is a registered username
+    cursor.execute('SELECT password FROM users WHERE username LIKE %s', [username])
     #store query result to variable, which should be a key value pair 
     queryResult = cursor.fetchone()
 
     #close cursor
     cursor.close()
 
-    #if email is registered,
+    #if username is registered,
     if queryResult is not None:
         print("Query Result:",queryResult)
-        #store the associated password of email to variable
+        #store the associated password of username to variable
         registeredPassword = queryResult.get('password')  
 
         #if the passwords match up, return true
@@ -53,4 +53,4 @@ def validateUser(email,password):
     else:
         return False
     
-
+    

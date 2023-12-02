@@ -2,6 +2,7 @@ from flask import Flask, request, redirect, render_template, url_for, jsonify
 from flask_mysqldb import MySQL
 from user import User
 import db
+import recommender
 
 app = Flask(__name__)
 
@@ -17,7 +18,7 @@ mysql = MySQL(app)
 @app.route('/database')
 def database():
     result = db.indexFunction()
-    stringReturn = "FIRST ENTRY IN USERS TABLE --> email: {}, name: {}, password: {}".format(result[0]['email'],result[0]['name'],result[0]['password'])
+    stringReturn = "FIRST ENTRY IN USERS TABLE --> username: {}, name: {}, password: {}".format(result[0]['username'],result[0]['name'],result[0]['password'])
     return stringReturn
 
 @app.route('/home')
@@ -37,20 +38,20 @@ def register():
 @app.route('/register', methods=['POST'])
 def signupUser():
     #use request.form.get to grab user data from register html page
-    email=request.form.get('email')
+    username=request.form.get('email')
     name=request.form.get('name')
     password=request.form.get('password')
 
     #create new user instance
-    newUser = User(email, name,password)
+    newUser = User(username, name,password)
     #call user method to insert user into db
     newUser.insertUser()
 
     #return json package of user info 
     return jsonify({
         'success': True, 
-        'userEmail': email,  
-        'userName':name, 
+        'username': username,  
+        'name':name, 
         'userPassword': password
         })
     #return redirect(url_for('home'))
@@ -58,14 +59,14 @@ def signupUser():
 @app.route('/login', methods=['POST'])
 def loginUser():
     #grab user data from login html page
-    email = request.form.get('email')
+    username = request.form.get('email')
     password = request.form.get('password')
 
     #print to console for testing 
-    print("Email entered:",email,"\nPassword entered:",password)
+    print("Username entered:",username,"\nPassword entered:",password)
 
     #call db validating method to see if user is registered
-    if db.validateUser(email, password):
+    if db.validateUser(username, password):
         #registered user, go to home page
         return jsonify({
             'success': True, 
@@ -76,7 +77,7 @@ def loginUser():
         #not registered, stay on login page
         return jsonify({
             'success': False, 
-            'message': 'Invalid email or password!'
+            'message': 'Invalid username or password!'
             })
         #return redirect(url_for('login'))
 

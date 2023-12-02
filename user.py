@@ -2,8 +2,8 @@ import db
 
 class User:
     TABLE = "user"
-    def __init__(self, email, name, password):
-        self.email = email      
+    def __init__(self, username, name, password):
+        self.username = username      
         self.name = name                    
         self.password = password           
     
@@ -14,8 +14,8 @@ class User:
             cursor = connection.cursor()
 
             #query to user info into database
-            query = 'INSERT INTO users(email, name, password) VALUES (%s, %s, %s);'
-            vals = (self.email, self.name, self.password)
+            query = 'INSERT INTO users(username, name, password) VALUES (%s, %s, %s);'
+            vals = (self.username, self.name, self.password)
             print(vals)
 
             #execut the query 

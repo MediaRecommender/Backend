@@ -1,9 +1,8 @@
-from flask import Flask, request, redirect, render_template, url_for
+from flask import Flask, request, redirect, render_template, url_for, jsonify 
 from flask_mysqldb import MySQL
 from user import User
 import db
-import openai
-openai.api_key = "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"
+import recommender
 
 app = Flask(__name__)
 
@@ -19,7 +18,7 @@ mysql = MySQL(app)
 @app.route('/database')
 def database():
     result = db.indexFunction()
-    stringReturn = "FIRST ENTRY IN USERS TABLE --> email: {}, name: {}, password: {}".format(result[0]['email'],result[0]['name'],result[0]['password'])
+    stringReturn = "FIRST ENTRY IN USERS TABLE --> username: {}, name: {}, password: {}".format(result[0]['username'],result[0]['name'],result[0]['password'])
     return stringReturn
 
 @app.route('/home')
@@ -37,47 +36,50 @@ def register():
 
 #POST method means expecting data back from user
 @app.route('/register', methods=['POST'])
-def signup_user():
-    #create new user instance. use request.form.get to grab user data from register html page
-    newUser = User(
-        email=request.form.get('email'),
-        name=request.form.get('name'),
-        password=request.form.get('password'),
-    )
+def signupUser():
+    #use request.form.get to grab user data from register html page
+    username=request.form.get('email')
+    name=request.form.get('name')
+    password=request.form.get('password')
+
+    #create new user instance
+    newUser = User(username, name,password)
     #call user method to insert user into db
     newUser.insertUser()
-    return redirect(url_for('home'))
+
+    #return json package of user info 
+    return jsonify({
+        'success': True, 
+        'username': username,  
+        'name':name, 
+        'userPassword': password
+        })
+    #return redirect(url_for('home'))
 
 @app.route('/login', methods=['POST'])
 def loginUser():
     #grab user data from login html page
-    email = request.form.get('email')
+    username = request.form.get('email')
     password = request.form.get('password')
 
     #print to console for testing 
-    print("Email entered:",email,"\nPassword entered:",password)
+    print("Username entered:",username,"\nPassword entered:",password)
 
     #call db validating method to see if user is registered
-    if db.validateUser(email, password):
+    if db.validateUser(username, password):
         #registered user, go to home page
-        return redirect(url_for('home'))
+        return jsonify({
+            'success': True, 
+            'message': 'Welcome!'
+            })
+        #redirect(url_for('home'))
     else:
         #not registered, stay on login page
-        return redirect(url_for('login'))
-    
-def recommendedMusic(song1, song2, song3, song4, song5):
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a music recommender system that will " +
-            "return 5 similar songs along with their respective artist names and cover art jpeg" +
-            "links in the form of a python dictionary when given a couple of song names"},
-            {"role": "user", "content": "return 5 similar songs along with their respective artist " +
-             "names and cover art jpeg links for the songs in the form of a python dictionary: {}, {}, {}, {}, {}".format(song1,song2,song3,song4,song5)}
-        ]
-    )
-    print(response.choices[0].message)
-    return response.choices[0].message
+        return jsonify({
+            'success': False, 
+            'message': 'Invalid username or password!'
+            })
+        #return redirect(url_for('login'))
 
 if __name__=='__main__':
     app.run(debug=True)

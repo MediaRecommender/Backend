@@ -71,7 +71,10 @@ def loginUser():
     #print("Username entered:",username,"\nPassword entered:",password)
     
     url = 'http://ec2-18-191-32-136.us-east-2.compute.amazonaws.com/'
-    params = {'username': 'username', 'password': 'password'}
+    params ={
+        'username': 'username',
+        'password': 'password'
+    }
 
     try:
         resp = requests.get(url, params=params)
@@ -86,15 +89,15 @@ def loginUser():
     if db.validateUser(username, password):
         
         #registered user, go to home page
-        return redirect(url_for('survey'))
+        #return redirect(url_for('survey'))
         return jsonify({
             'success': True, 
             'message': 'Welcome!'
             })
-        #redirect(url_for('home'))
+      
     else:
         #not registered, stay on login page
-        return redirect(url_for('login'))
+        #return redirect(url_for('login'))
         return jsonify({
             'success': False, 
             'message': 'Invalid username or password!'

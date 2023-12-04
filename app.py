@@ -75,33 +75,36 @@ def loginUser():
         'username': 'username',
         'password': 'password'
     }
-      
+
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)
         data = resp.json()
         username = data['username']
         password = data['password']
+        #call db validating method to see if user is registered
+        if db.validateUser(username, password):
+            #registered user, go to home page
+            #return redirect(url_for('survey'))
+            return jsonify({
+                'success': True, 
+                'message': 'Welcome!'
+                })
+        else:
+            #not registered, stay on login page
+            #return redirect(url_for('login'))
+            return jsonify({
+                'success': False, 
+                'message': 'Invalid username or password!'
+            })
+
     except requests.exceptions.RequestException as e:
         print(f"Error: {e}")
-
-    #call db validating method to see if user is registered
-    if db.validateUser(username, password):
-        
-        #registered user, go to home page
-        #return redirect(url_for('survey'))
-        return jsonify({
-            'success': True, 
-            'message': 'Welcome!'
-            })
-      
-    else:
-        #not registered, stay on login page
-        #return redirect(url_for('login'))
-        return jsonify({
-            'success': False, 
-            'message': 'Invalid username or password!'
-            })
+    
+    return jsonify({
+        'success': False,
+        'message': 'The try block didnt go through'
+    })
 
 if __name__=='__main__':
     app.run(debug=True)

@@ -70,17 +70,12 @@ def loginUser():
     #print to console for testing 
     #print("Username entered:",username,"\nPassword entered:",password)
     
-    url = 'http://ec2-18-191-32-136.us-east-2.compute.amazonaws.com/'
+    url = 'http://ec2-18-191-32-136.us-east-2.compute.amazonaws.com/login'
     params ={
         'username': 'username',
         'password': 'password'
     }
-    return jsonify({
-            'success': True, 
-            'message': 'Welcome!'
-            })
       
-
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()  # Raise an HTTPError for bad responses (4xx and 5xx)

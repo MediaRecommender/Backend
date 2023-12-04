@@ -75,6 +75,11 @@ def loginUser():
         'username': 'username',
         'password': 'password'
     }
+    return jsonify({
+            'success': True, 
+            'message': 'Welcome!'
+            })
+      
 
     try:
         resp = requests.get(url, params=params)

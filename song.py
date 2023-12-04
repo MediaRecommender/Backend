@@ -1,21 +1,22 @@
 import db
+from app import app
 
-class User:
-  
-    def __init__(self, username, name, password):
-        self.username = username      
-        self.name = name                    
-        self.password = password           
-    
-    def insertUser(self):
+class Song:
+   
+    def __init__(self, title, artist, imageURL):
+        self.title = title      
+        self.artist = artist                    
+        self.imageURL = imageURL 
+        
+    def insertSong(self):
         try:
             #Connect to db
             connection = db.connectDB().connection
             cursor = connection.cursor()
 
             #query to user info into database
-            query = 'INSERT INTO users(username, name, password) VALUES (%s, %s, %s);'
-            vals = (self.username, self.name, self.password)
+            query = 'INSERT INTO songs(title, artist, imageURL) VALUES (%s, %s, %s);'
+            vals = (self.title, self.artist, self.imageURL)
             print(vals)
 
             #execut the query 

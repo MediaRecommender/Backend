@@ -1,9 +1,9 @@
 from flask import Flask
 from flask_mysqldb import MySQL
+from app import app
 
 #method to avoid repeption when conntecting db and cursor
 def connectDB():
-    from app import app, mysql
     mysql = MySQL(app)
     return mysql
 

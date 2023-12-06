@@ -8,10 +8,10 @@ import recommender
 app = Flask(__name__)
     
 #establish the conntection to aws db
-app.config['MYSQL_USER'] = 'admin'
-app.config['MYSQL_PASSWORD'] = 'password'
-app.config['MYSQL_HOST'] = 'musicrecommender-db.cwyhyfiwavvc.us-west-1.rds.amazonaws.com'
-app.config['MYSQL_DB'] ='musicrecommender'
+app.config['MYSQL_USER'] = 'hussain'
+app.config['MYSQL_PASSWORD'] = 'beefbulgogi'
+app.config['MYSQL_HOST'] = 'musicrecommender4800.cwyhyfiwavvc.us-west-1.rds.amazonaws.com'
+app.config['MYSQL_DB'] ='musicrecommender4800'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 

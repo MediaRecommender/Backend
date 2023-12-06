@@ -1,4 +1,4 @@
-import db
+import mysql
 
 class User:
   
@@ -10,7 +10,7 @@ class User:
     def insertUser(self):
         try:
             #Connect to db
-            connection = db.connectDB().connection
+            connection = mysql.connection
             cursor = connection.cursor()
 
             #query to user info into database

@@ -1,17 +1,15 @@
-from flask import Flask
-from flask_mysqldb import MySQL
-from app import app
+from app import mysql
 
 #method to avoid repeption when conntecting db and cursor
-def connectDB():
-    mysql = MySQL(app)
-    return mysql
+# def connectDB():
+#     mysql = MySQL(app)
+#     return mysql
 
 #testing function for how to index a query result
 #IMPORTANT!, each index in a table is given as a dictionary, access table data from key and value
 def indexFunction(): 
     #establish connection to db
-    connection = connectDB().connection
+    connection = mysql.connection
     cursor = connection.cursor()
 
     #run a query 
@@ -26,7 +24,7 @@ def indexFunction():
 
 def validateUser(username,password):
     #establish connection to db
-    connection = connectDB().connection
+    connection = mysql.connection
     cursor = connection.cursor()
     
     #execute query to select password belonging to username user entered, if it is a registered username

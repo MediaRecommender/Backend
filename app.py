@@ -1,8 +1,6 @@
 from flask import Flask, request, redirect, render_template, url_for, jsonify
 from flask_mysqldb import MySQL
 import requests
-from user import User
-import db
 import recommender
 
 app = Flask(__name__)
@@ -15,12 +13,62 @@ app.config['MYSQL_DB'] ='musicrecommender4800'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 
-#route is just for testing db functions
-@app.route('/database')
-def database():
-    result = db.indexFunction()
-    stringReturn = "FIRST ENTRY IN USERS TABLE --> username: {}, name: {}, password: {}".format(result[0]['username'],result[0]['name'],result[0]['password'])
-    return stringReturn
+class User:
+    def __init__(self, username, name, password):
+        self.username = username      
+        self.name = name                    
+        self.password = password           
+    
+    def insertUser(self):
+        try:
+            #Connect to db
+            connection = mysql.connection
+            cursor = connection.cursor()
+
+            #query to user info into database
+            query = 'INSERT INTO users(username, name, password) VALUES (%s, %s, %s);'
+            vals = (self.username, self.name, self.password)
+            print(vals)
+
+            #execut the query 
+            cursor.execute(query, vals)
+
+            #coomit the connection to actually change the table in db
+            connection.commit()
+            #close cursor
+            cursor.close()
+
+        except Exception as e:
+            print(f"Error: {str(e)}")
+
+def validateUser(username,password):
+    #establish connection to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+    
+    #execute query to select password belonging to username user entered, if it is a registered username
+    cursor.execute('SELECT password FROM users WHERE username LIKE %s', [username])
+    #store query result to variable, which should be a key value pair 
+    queryResult = cursor.fetchone()
+
+    #close cursor
+    cursor.close()
+
+    #if username is registered,
+    if queryResult is not None:
+        print("Query Result:",queryResult)
+        #store the associated password of username to variable
+        registeredPassword = queryResult.get('password')  
+
+        #if the passwords match up, return true
+        if password == registeredPassword:     
+            return True
+        else:
+            #if user entered incorrect password
+            return False
+    #if not registered.
+    else:
+        return False
 
 @app.route('/home')
 def home():
@@ -69,7 +117,7 @@ def loginUser():
     #print to console for testing 
     #print("Username entered:",username,"\nPassword entered:",password)
     #call db validating method to see if user is registered
-    if db.validateUser(username, password):
+    if validateUser(username, password):
         #registered user, go to home page
         #return redirect(url_for('survey'))
         return jsonify({

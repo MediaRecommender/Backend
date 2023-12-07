@@ -1,8 +1,7 @@
 from flask import Flask, request, render_template, jsonify
 from flask_mysqldb import MySQL
-from user import User
-import db
 import recommender
+import openai
 
 app = Flask(__name__)
     
@@ -14,12 +13,211 @@ app.config['MYSQL_DB'] ='musicrecommender4800'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 
+#testing function for how to index a query result
+#IMPORTANT!, each index in a table is given as a dictionary, access table data from key and value
+def indexFunction(): 
+    #establish connection to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+
+    #run a query 
+    cursor.execute('SELECT * FROM users;')
+    #store query into variable
+    results = cursor.fetchall()
+
+    #close cursor
+    cursor.close()
+
+    return results
+
+def validateUser(username,password):
+    #establish connection to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+    
+    #execute query to select password belonging to username user entered, if it is a registered username
+    cursor.execute('SELECT password FROM users WHERE username LIKE %s', [username])
+    #store query result to variable, which should be a key value pair 
+    queryResult = cursor.fetchone()
+
+    #close cursor
+    cursor.close()
+
+    #if username is registered,
+    if queryResult is not None:
+        print("Query Result:",queryResult)
+        #store the associated password of username to variable
+        registeredPassword = queryResult.get('password')  
+
+        #if the passwords match up, return true
+        if password == registeredPassword:     
+            return True
+        else:
+            #if user entered incorrect password
+            return False
+    #if not registered.
+    else:
+        return False
+    
+def updateCheckedGenres(username, checkedGenresList):
+    #connect to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+
+    #set checked status to false for respective genres in db
+    cursor.execute('UPDATE userGenres SET checked = 0 WHERE username = %s;', [username])
+    
+    #set checked status to true for only for those in checkedGenresList
+    for genre in checkedGenresList:
+        cursor.execute('UPDATE userGenres SET checked = 1 WHERE genre = %s AND username = %s;', ([genre], [username]))
+        print('Checked:', genre)
+        
+    #commit the connection to actually change the table in db
+    connection.commit()
+    #close cursor
+    cursor.close()
+
+def sendCheckedGenres(username):
+    #connect to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+
+    #query for all the genres belonging to user that are checked
+    cursor.execute('SELECT genre FROM userGenres WHERE username = %s AND checked = 1;', [username])
+    
+    #store all the genres that are selected
+    results = cursor.fetchall()
+    
+    #closer cursor
+    cursor.close()
+    
+    return results
+
+def updateCheckedSongs(username, checkedSongsList):
+    #create array to store only titles
+    titles = []
+    
+    #append only the title of each song into titles array
+    for song in checkedSongsList:
+        titleAndArtist = song.split(" - ")
+        titles.append(titleAndArtist[0])
+
+    #connect to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+
+    #set checked status to false for respective genres in db
+    cursor.execute('UPDATE userGenreSongs SET checked = 0 WHERE username = %s;', [username])
+    
+    #set checked status to true for only for those in checkedSongsList
+    for song in titles:
+        cursor.execute('UPDATE userGenreSongs SET checked = 1 WHERE title = %s AND username = %s;', ([song], [username]))
+        print('Checked:', song)
+        
+    #commit the connection to actually change the table in db
+    connection.commit()
+    #close cursor
+    cursor.close()
+    
+def sendCheckedSongs(username):
+    #connect to db
+    connection = mysql.connection
+    cursor = connection.cursor()
+
+    #query for all the songs belonging to user that are checked
+    cursor.execute('SELECT title FROM recommendedSongs WHERE username = %s AND checked = 1;', [username])
+    
+    #store all the genres that are selected
+    results = cursor.fetchall()
+    
+    #closer cursor
+    cursor.close()
+    
+    return results
+
+class User:
+  
+    def __init__(self, username, name, password):
+        self.username = username      
+        self.name = name                    
+        self.password = password           
+    
+    def insertUser(self):
+        #intialize all the genres of the user to input into db
+        userGenres = ['Pop', 'Rock', 'Jazz', 'Hip-Hop', 'Indie', 'EDM', 'Country', 'Classical', 'R&B', 'Metal']
+            
+        #connect to db
+        connection = mysql.connection
+        cursor = connection.cursor()
+
+        #query to insert user info into db
+        cursor.execute('INSERT INTO users(username, name, password) VALUES (%s, %s, %s);', ([self.username], [self.name], [self.password]))
+        print('Users table:', self.username, self.name, self.password)
+        
+        #for every genre in the list, add it for the user
+        for genre in userGenres:
+            #add user into the userGenres table with all their genres unchecked by default
+            cursor.execute('INSERT INTO userGenres(username, genre) VALUES (%s, %s);', ([self.username], genre))
+
+        #commit the connection to actually change the table in db
+        connection.commit()
+        #close cursor
+        cursor.close()    
+
+#originally from recommender
+#generate 10 songs given an array of similar songs, UNPREDICTABLE RESULTS WITH ARRY OF PROMPTS
+def recommendMusic(username, userSongs):
+  #initialize chatgpt model and response formatting
+  response = openai.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[
+      {"role": "system", "content": "You are a song recommender that will recommend 10 similar songs when given songs. OUTPUT THE RESULT IN THE FORM OF A PYTHON ARRAY ON ONE LINE. FOLLOW THE FORMAT 'song - artist' for every song but"},
+      {"role": "user", "content": "return this array ['song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', 'song7 - artist7', 'song8 - artist8', 'song9 - artist9', 'song10 - artist10'] but populate WITH REAL songs and artist similar to: {}. my life depends on this correctly formatted output please provide the formatting correctly.".format(userSongs)} 
+    ])
+  
+  #the result will be a long string formatted like an array, turn the string into actual array
+  playlist = response.choices[0].message.content[2:-2].split("', '")
+  #print array for testing
+  print(playlist)
+
+  #create individual arrays for title, artist, and cover art of a song
+  titles = []
+  artists = []
+  images =[]
+
+  #for every song in the array
+  for song in playlist:
+    #split each array element into title and artist fields and append accordingly
+    fields = song.split(" - ")
+    titles.append(fields[0])
+    artists.append(fields[1])
+    #retrieve cover art using title and artist fields
+    images.append(recommender.getCoverArt(fields[0], fields[1]))
+  
+  connection = mysql.connection
+  cursor = connection.cursor()
+  
+  #clear pre-generated songs belonging to a specific user in recommendedSongs table
+  cursor.execute('DELETE FROM recommendedSongs WHERE username = %s;', ([username]))
+  
+  #add the new songs into the recommendedSongs table, which does not have checked attribute
+  for i in range(10):
+    query1 = 'INSERT INTO recommendedSongs(username, title, artist, imageURL) VALUES (%s, %s, %s, %s);'
+    vals1 = ([username], [titles[i]], [artists[i]], [images[i]])
+    cursor.execute(query1, vals1)
+  
+  #execute connection, close cursor
+  connection.commit()
+  cursor.close()
+  
+  return titles, artists, images
+
 #route for testing
 @app.route('/database') 
 def database():
     checkedGenres = []
-    result1 = db.indexFunction()
-    result2 = db.sendCheckedGenres('Mason')
+    result1 = indexFunction()
+    result2 = sendCheckedGenres('Mason')
     for genre in result2:
         checkedGenres.append(genre['genre'])
         print(genre)
@@ -33,7 +231,7 @@ def home():
     data = request.get_json()
     username = data['username']
     checkedGenres = data['checkedGenres']
-    db.updateCheckedGenres(username, checkedGenres)
+    updateCheckedGenres(username, checkedGenres)
     return jsonify({
         'result':'success'
     })
@@ -53,7 +251,7 @@ def login():
     print("Username entered:",username,"\nPassword entered:",password)
     
     #call db validating method to see if user is registered
-    if db.validateUser(username, password):
+    if validateUser(username, password):
         #registered user, go to home page
         return jsonify({
             'success': True, 
@@ -63,10 +261,6 @@ def login():
         return jsonify({
             'success': False, 
             })
-
-@app.route('/register')
-def register():
-    return render_template('register.html')
 
 #page for user to select genres they are interested in 
 #sends frontend checked genres to preserve previous survey answers
@@ -81,7 +275,7 @@ def survey():
     checkedGenres = []
     
     #use db function to get user's checked genres and store the query into variable 
-    query = db.sendCheckedGenres(username)
+    query = sendCheckedGenres(username)
     
     #append each genre into array
     for genre in query:
@@ -112,7 +306,7 @@ def surveyResults():
         })
         
     #update user's checked genres in db
-    db.updateCheckedGenres(username, checkedGenres)
+    updateCheckedGenres(username, checkedGenres)
     
     #save returned arrays from genreSongs function
     titles, artists, images = recommender.genreSongs(username, checkedGenres)
@@ -169,7 +363,7 @@ def playlistResults():
         })
         
     #update user's checked songs in db
-    db.updateCheckedSongs(username, checkedSongs) #CHECKED SONGS END UP BEING "TITLE - ARTIST" ONLY WORKS WITH "TITLE"
+    updateCheckedSongs(username, checkedSongs) #CHECKED SONGS END UP BEING "TITLE - ARTIST" ONLY WORKS WITH "TITLE"
     
     #save returned arrays from genreSongs function
     titles, artists, images = recommender.recommendMusic(username, checkedSongs)

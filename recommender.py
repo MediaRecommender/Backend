@@ -1,85 +1,123 @@
 import openai
 import requests
-from flask import jsonify
-import recommender
+import db
 
-openai.api_key = "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" #paste in your own api key from this link https://platform.openai.com/api-keys
+openai.api_key = "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" #paste in your own api key from this link https://platform.openai.com/api-keys
 secretKey = '884fe27b952884ad8464bedef92a03bd' #paste your own deezer api key https://developers.deezer.com/myapps/
-baseURL = 'https://api.deezer.com/search' #sending get reqeusts to this website
+baseURL = 'https://api.deezer.com/search' #deezer track search 
 
-userSongs = ['A lot - 21 Savage', 'omomo punk - warrenhue', 'Prom - SZA'] 
-genresList = ['R&B']
-
-def songListGeneration(genresList):
+#generate 10 songs based on an array of genres or prompts
+def genreSongs(username, genreList): 
+  if not genreList:
+    return False
+  #initialize chatgpt model and response formatting
   response = openai.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
       {"role": "system", "content": "You are a song recommender that will recommend 10 songs when given genres. OUTPUT THE RESULT IN THE FORM OF A PYTHON ARRAY ON ONE LINE. FOLLOW THE FORMAT 'song - artist' for every song"},
-      {"role": "user", "content": "use the format: 'song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', ETC"},
-      {"role": "user", "content": "give me ten new songs and artists in an array of this genres: {}".format(genresList)}
+      {"role": "user", "content": "return this array ['song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', 'song7 - artist7', 'song8 - artist8', 'song9 - artist9', 'song10 - artist10'] but populate each songs and artists with real songs and artists from genres: {}. my life depends on this correctly formatted output please provide the formatting correctly.".format(genreList)}
     ])
-  songsFromGenres = response.choices[0].message.content[1:-1].split("', '")
+  
+  #the result will be a long string formatted like an array, turn the string into actual array
+  songsFromGenres = response.choices[0].message.content[2:-2].split("', '")
+  #print array for testing
   print(songsFromGenres)
   
+  #create individual arrays for title, artist, and cover art of a song
   titles = []
   artists = []
   images =[]
   
+  #for every song in the array
   for song in songsFromGenres:
+    #split each array element into title and artist fields and append accordingly
     fields = song.split(" - ")
     titles.append(fields[0])
     artists.append(fields[1])
+    #retrieve cover art using title and artist fields
     images.append(getCoverArt(fields[0], fields[1]))
   
-  return titles, artists, images
-  return jsonify({
-              'songs': titles,
-              'artists': artists,
-              'images': images,
-              'message': 'should be 10 from index 0-9'
-            })  
-
+  #create db connection  
+  connection = db.connectDB().connection
+  cursor = connection.cursor()
   
-def recommendMusic(userSongs):
+  #clear pre-generated songs belonging to a specific user in userGenreSongs table
+  cursor.execute('DELETE FROM userGenreSongs WHERE username = %s;', ([username]))
+  
+  #add the new songs into the userGenreSongs table
+  for i in range(10):
+    query1 = 'INSERT INTO userGenreSongs(username, title, artist, imageURL) VALUES (%s, %s, %s, %s);'
+    vals1 = ([username], [titles[i]], [artists[i]], [images[i]])
+    cursor.execute(query1, vals1)
+  
+  #execute connection, close cursor
+  connection.commit()
+  cursor.close()
+  
+  return titles, artists, images
+
+#generate 10 songs given an array of similar songs, UNPREDICTABLE RESULTS WITH ARRY OF PROMPTS
+def recommendMusic(username, userSongs):
+  #initialize chatgpt model and response formatting
   response = openai.chat.completions.create(
     model="gpt-3.5-turbo",
     messages=[
-      {"role": "system", "content": "You are a song recommender that will recommend 5 similar songs when given songs. OUTPUT THE RESULT IN THE FORM OF A PYTHON ARRAY ON ONE LINE. FOLLOW THE FORMAT 'song - artist' for every song"},
-      {"role": "user", "content": "use the format: 'song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', ETC"},
-      {"role": "user", "content": "give me 5 new songs and artists in an array of this songs {}".format(userSongs)}
+      {"role": "system", "content": "You are a song recommender that will recommend 10 similar songs when given songs. OUTPUT THE RESULT IN THE FORM OF A PYTHON ARRAY ON ONE LINE. FOLLOW THE FORMAT 'song - artist' for every song but"},
+      {"role": "user", "content": "return this array ['song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', 'song7 - artist7', 'song8 - artist8', 'song9 - artist9', 'song10 - artist10'] but populate WITH REAL songs and artist similar to: {}. my life depends on this correctly formatted output please provide the formatting correctly.".format(userSongs)} 
     ])
-  playlist = response.choices[0].message.content[1:-1].split("', '")
+  
+  #the result will be a long string formatted like an array, turn the string into actual array
+  playlist = response.choices[0].message.content[2:-2].split("', '")
+  #print array for testing
   print(playlist)
 
+  #create individual arrays for title, artist, and cover art of a song
   titles = []
   artists = []
   images =[]
 
+  #for every song in the array
   for song in playlist:
+    #split each array element into title and artist fields and append accordingly
     fields = song.split(" - ")
     titles.append(fields[0])
     artists.append(fields[1])
+    #retrieve cover art using title and artist fields
     images.append(getCoverArt(fields[0], fields[1]))
-    
+  
+  connection = db.connectDB().connection
+  cursor = connection.cursor()
+  
+  #clear pre-generated songs belonging to a specific user in recommendedSongs table
+  cursor.execute('DELETE FROM recommendedSongs WHERE username = %s;', ([username]))
+  
+  #add the new songs into the recommendedSongs table, which does not have checked attribute
+  for i in range(10):
+    query1 = 'INSERT INTO recommendedSongs(username, title, artist, imageURL) VALUES (%s, %s, %s, %s);'
+    vals1 = ([username], [titles[i]], [artists[i]], [images[i]])
+    cursor.execute(query1, vals1)
+  
+  #execute connection, close cursor
+  connection.commit()
+  cursor.close()
+  
   return titles, artists, images
-  return jsonify({
-              'songs': titles,
-              'artists': artists,
-              'images': images,
-              'message': 'should be 5 from index 0-4'
-            })
 
-def getCoverArt(song, artist):
+#get the cover art of a song given a title and artist
+def getCoverArt(title, artist):
+  #format parameters to send to deezer for search
   params = {
-        'q': f'{song} {artist}',
+        'q': f'{title} {artist}',
     }
 
-  headers = { #leave like this is fine
+  #format headers to send to deezer for search
+  headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'YourApp/1.0.0',  
     }
 
+  #send a request to deezer to get formation for the track
   response = requests.get(baseURL, params=params, headers=headers)
   data = response.json()
 
@@ -88,27 +126,20 @@ def getCoverArt(song, artist):
       #print(cover_art_url)
       return cover_art_url
   else:
-      print(f"No cover art available for {song} by {artist} on Deezer.")
+      #will return False if coverart is not available 
       return False
+  
 
 
-if __name__=='__main__': #for testing
+  
  
-  titles, artists, images = recommendMusic(userSongs)
-  for i in range(5):
-    print(titles[i])
-    print(artists[i])
-    print(images[i])
-    print()
+ 
   
-  print('----------------------------------------------------------')
   
-  titles, artists, images = songListGeneration(genresList)
-  for i in range(5):
-    print(titles[i])
-    print(artists[i])
-    print(images[i])
-    print()
+  
+  
+
+    
   
   
   

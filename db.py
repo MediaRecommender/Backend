@@ -51,6 +51,30 @@ def validateUser(username,password):
     #if not registered.
     else:
         return False
+
+def sendCheckedGenres(username):
+    #connect to db
+    connection = connectDB().connection
+    cursor = connection.cursor()
+
+    #query for all the genres belonging to user that are checked
+    cursor.execute('SELECT genre FROM userGenres WHERE username = %s AND checked = 1;', [username])
+    
+    #store all the genres that are selected
+    query = cursor.fetchall()
+    
+    #create array to return list of user's checked genres in survey
+    checkedGenres = []
+    
+    #append each genre into array
+    for genre in query:
+        checkedGenres.append(genre['genre'])
+        print(genre)
+    
+    #closer cursor
+    cursor.close()
+    
+    return checkedGenres
     
 def updateCheckedGenres(username, checkedGenresList):
     #connect to db
@@ -70,61 +94,118 @@ def updateCheckedGenres(username, checkedGenresList):
     #close cursor
     cursor.close()
 
-def sendCheckedGenres(username):
+def sendGenreSongs(username):
     #connect to db
     connection = connectDB().connection
     cursor = connection.cursor()
 
-    #query for all the genres belonging to user that are checked
-    cursor.execute('SELECT genre FROM userGenres WHERE username = %s AND checked = 1;', [username])
+    #query for all the genre songs belonging to user
+    cursor.execute('SELECT * FROM userGenreSongs WHERE username = %s;', [username])
     
-    #store all the genres that are selected
-    results = cursor.fetchall()
+    #store all the genre songs that are selected
+    genreSongs = cursor.fetchall()
     
+    #create arrays to store each detail of a song
+    titles = []
+    artists = []
+    images = []
+    checked = []
+    
+    #insert information into arrays
+    for song in genreSongs:
+        titles.append(song['title'])
+        artists.append(song['artist'])
+        images.append(song['imageURL'])
+        checked.append(song['checked'])
+        
     #closer cursor
     cursor.close()
     
-    return results
-
-def updateCheckedSongs(username, checkedSongsList):
-    #create array to store only titles
-    titles = []
+    #return 3 arrays for the titless, artists, and imageURLs
+    return (titles, artists, images, checked)
     
-    #append only the title of each song into titles array
-    for song in checkedSongsList:
-        titleAndArtist = song.split(" - ")
-        titles.append(titleAndArtist[0])
-
+#checkedGenreSongsList = ["Get You - Daniel Caesar", "Best Part - Daniel Caesar", "Blinding Lights - The Weekend"]
+def updateCheckedGenreSongs(username, checkedGenreSongsList):
     #connect to db
     connection = connectDB().connection
     cursor = connection.cursor()
+    
+    #create array for only storing song titles
+    titles = []
+    
+    #append each title into the array
+    for titleAndArtist in checkedGenreSongsList:
+        titles.append(titleAndArtist.split(" - ")[0])
 
     #set checked status to false for respective genres in db
     cursor.execute('UPDATE userGenreSongs SET checked = 0 WHERE username = %s;', [username])
     
     #set checked status to true for only for those in checkedSongsList
-    for song in titles:
-        cursor.execute('UPDATE userGenreSongs SET checked = 1 WHERE title = %s AND username = %s;', ([song], [username]))
-        print('Checked:', song)
+    for title in titles:
+        cursor.execute('UPDATE userGenreSongs SET checked = 1 WHERE title = %s AND username = %s;', ([title], [username]))
+        print('Checked:', title)
         
     #commit the connection to actually change the table in db
     connection.commit()
     #close cursor
     cursor.close()
+
+def getPlaylist(username):
+    #connect to db
+    connection = connectDB().connection
+    cursor = connection.cursor()
+
+    #query for all the playlist songs belonging to user
+    cursor.execute('SELECT * FROM recommendedSongs WHERE username = %s;', [username])
     
-def sendCheckedSongs(username):
+    #store all the backlogged songs that are selected
+    playlist = cursor.fetchall()
+    
+    #create arrays to store each detail of a song
+    titles = []
+    artists = []
+    images = []
+    
+    #insert information into arrays
+    for song in playlist:
+        titles.append(song['title'])
+        artists.append(song['artist'])
+        images.append(song['imageURL'])
+        
+    #closer cursor
+    cursor.close()
+    
+    #return 3 arrays for the titless, artists, and imageURLs
+    return (titles, artists, images)
+    
+def getBacklog(username):
     #connect to db
     connection = connectDB().connection
     cursor = connection.cursor()
 
     #query for all the songs belonging to user that are checked
-    cursor.execute('SELECT title FROM recommendedSongs WHERE username = %s AND checked = 1;', [username])
+    cursor.execute('SELECT * FROM backlog WHERE username = %s;', [username])
     
-    #store all the genres that are selected
-    results = cursor.fetchall()
+    #store all the backlogged songs that are selected
+    previousPlaylist = cursor.fetchall()
     
+    #create arrays to store each detail of a song
+    titles = []
+    artists = []
+    images = []
+    
+    #insert information into arrays
+    for song in previousPlaylist:
+        titles.append(song['title'])
+        artists.append(song['artist'])
+        images.append(song['imageURL'])
+        
     #closer cursor
     cursor.close()
     
-    return results
+    #return 3 arrays for the titless, artists, and imageURLs
+    return (titles, artists, images)
+
+    
+  
     

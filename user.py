@@ -29,4 +29,27 @@ class User:
         #close cursor
         cursor.close()
 
+    def deleteUser(username):
+        #connect to db
+        connection = db.connectDB().connection
+        cursor = connection.cursor()
+
+        #delete all instances of the user from all tables
+        cursor.execute('DELETE FROM users WHERE username = %s', [username])
+        cursor.execute('DELETE FROM userGenres WHERE username = %s', [username])
+        cursor.execute('DELETE FROM userGenreSongs WHERE username = %s', [username])
+        cursor.execute('DELETE FROM recommendedSongs WHERE username = %s', [username])
+        cursor.execute('DELETE FROM backlog WHERE username = %s', [username])
+        #store all the genres that are selected
+        
+        #commit the connection to actually change the table in db
+        connection.commit()
+        
+        #closer cursor
+        cursor.close()
+       
+
+    
+        
+
             

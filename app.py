@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from user import User
 import db
@@ -64,149 +64,127 @@ def login():
             'success': False, 
             })
 
-@app.route('/register')
-def register():
-    return render_template('register.html')
-
-#page for user to select genres they are interested in 
-#sends frontend checked genres to preserve previous survey answers
-@app.route('/survey', methods = ['GET', 'POST']) 
-def survey():
+#FRONTEND GETS USER'S GENRE SURVEY DATA
+#sends frontend genres that the user checked
+@app.route('/genreSurvey', methods = ['GET', 'POST']) 
+def loadGenreSurvey():
     #access and store json package containing genres array
     data = request.get_json()
-    #need username to specify which user to make songs for
+    #need username to specify which user to get genre survey data from
     username = data['username']
     
-    #create array to return list of user's checked genres in survey
-    checkedGenres = []
-    
     #use db function to get user's checked genres and store the query into variable 
-    query = db.sendCheckedGenres(username)
+    checkedGenres = db.sendCheckedGenres(username)
     
-    #append each genre into array
-    for genre in query:
-        checkedGenres.append(genre['genre'])
-        print(genre)
-
-    #return genre array in json package
+    #return checked genres array in json package
     return jsonify({
         'checkedGenres': checkedGenres
     })
 
-#page for the user to select songs based off genres they selected on survey page
-#updates checked genres in db right after taking the survey and going to survey results page
-@app.route('/surveyResults', methods=['GET', 'POST']) #CHECK IF USERNAME ENTRIES ARE IN USERGENRESONGS, IF THEY ARE SKIP THE GENRESONG FUNCTION
-
-def surveyResults():
-    #access and store json package containing genres array
+#FRONTEND SENDS USER'S GENRE SURVEY DATA
+#updates newly checked genres and creates genre songs in db right after user submits the survey 
+@app.route('/genreSurvey/submit', methods=['GET', 'POST']) 
+def submitGenreSurvey():
+    #access and store json package 
     data = request.get_json()
-    #need username to specify which user to make songs for
+    #need username to specify which user to update genre survey data for
     username = data['username']
     #get list of genres user checked 
     checkedGenres = data['checkedGenres']
     
-    #return false if user did not check any genres, hence array will be empty
+    #if the user did not check any genres, hence the array is empty
     if not checkedGenres:
         return jsonify({
-            'success':False
-        })
+            'success': False,
+            'message': '{} did not check any genres on the survey.'.format(username)
+            })
         
     #update user's checked genres in db
     db.updateCheckedGenres(username, checkedGenres)
+    #generate genre songs in the database for username
+    recommender.generateGenreSongs(username, checkedGenres)
     
-    #save returned arrays from genreSongs function
-    titles, artists, images = recommender.genreSongs(username, checkedGenres)
-    
-    #return 10 songs in json package
+    #return success status
     return jsonify({
-        'title0': titles[0],
-        'artist0': artists[0],
-        'image0': images[0],
-        'title1': titles[1],
-        'artist1': artists[1],
-        'image1': images[1],
-        'title2': titles[2],
-        'artist2': artists[2],
-        'image2': images[2],
-        'title3': titles[3],
-        'artist3': artists[3],
-        'image3': images[3],
-        'title4': titles[4],
-        'artist4': artists[4],
-        'image4': images[4],
-        'title5': titles[5],
-        'artist5': artists[5],
-        'image5': images[5],
-        'title6': titles[6],
-        'artist6': artists[6],
-        'image6': images[6],
-        'title7': titles[7],
-        'artist7': artists[7],
-        'image7': images[7],
-        'title8': titles[8],
-        'artist8': artists[8],
-        'image8': images[8],
-        'title9': titles[9],
-        'artist9': artists[9],
-        'image9': images[9],
+        'success': True,
+        'message': 'Newly checked genres and generated genre songs have been updated for {}'.format(username)
+        })
+    
+#FRONTEND GETS USER'S GENRE SONGS SURVEY DATA
+#sends frontend all the user's genre songs along with their respective checked status'
+@app.route('/genreSongs', methods=['GET', 'POST']) 
+def loadGenreSongsSurvey():
+    #access and store json package 
+    data = request.get_json()
+    #need username to specify which user to load genre songs for
+    username = data['username']
+    
+    #create 4 variables to store array returns from getBacklog
+    titles, artists, images, checked = db.sendGenreSongs(username)
+
+    #return 10 genre songs, along with respective checked status in json
+    return jsonify({
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        'checked': checked
         })
 
+#FRONTEND SENDS USER'S GENRE SONGS SURVEY DATA
+#updates newly checked genre songs and generates new playlist in db
+@app.route('/genreSongs/submit', methods=['GET', 'POST']) 
+def submitGenreSongsSurvey():
+    #access and store json package 
+    data = request.get_json()
+    #need username to specify which user to update genre songs for
+    username = data['username']
+    #get list of genres songs user checked = ["Get You - Daniel Caesar", "Best Part - Daniel Caesar", "Blinding Lights - The Weekend"]
+    checkedGenreSongs = data['checkedGenreSongs']
     
-#user's final playlist page    
-@app.route('/playlistResults', methods=['GET', 'POST']) 
-def playlistResults():
+    #update the genre songs that the user checked
+    db.updateCheckedGenreSongs(username, checkedGenreSongs)
+    #generate the playlist in the db 
+    recommender.generatePlaylistSongs(username, checkedGenreSongs)
+    
+    return jsonify({
+        'success': True,
+        'message': 'Newly checked genre songs and generated playlist has been updated for {}'.format(username)
+        })
+ 
+#FRONTEND GETS USER'S PLAYLIST DATA
+@app.route('/playlist', methods=['GET', 'POST']) 
+def loadPlaylist():
     #access and store json package containing array of user selected songs from genresSongs
     data = request.get_json()
     #need username to specify which user to make songs for
     username = data['username']
-    #get list of songs user checked 
-    checkedSongs = data['checkedSongs']
     
-    #return false if user did not check any songs, hence array will be empty
-    if not checkedSongs:
-        return jsonify({
-            'success': False
-        })
-        
-    #update user's checked songs in db
-    db.updateCheckedSongs(username, checkedSongs) #CHECKED SONGS END UP BEING "TITLE - ARTIST" ONLY WORKS WITH "TITLE"
-    
-    #save returned arrays from genreSongs function
-    titles, artists, images = recommender.recommendMusic(username, checkedSongs)
+    titles, artists, images = db.getPlaylist(username)
     
     #return 10 final songs in json package
     return jsonify({
-        'title0': titles[0],
-        'artist0': artists[0],
-        'image0': images[0],
-        'title1': titles[1],
-        'artist1': artists[1],
-        'image1': images[1],
-        'title2': titles[2],
-        'artist2': artists[2],
-        'image2': images[2],
-        'title3': titles[3],
-        'artist3': artists[3],
-        'image3': images[3],
-        'title4': titles[4],
-        'artist4': artists[4],
-        'image4': images[4],
-        'title5': titles[5],
-        'artist5': artists[5],
-        'image5': images[5],
-        'title6': titles[6],
-        'artist6': artists[6],
-        'image6': images[6],
-        'title7': titles[7],
-        'artist7': artists[7],
-        'image7': images[7],
-        'title8': titles[8],
-        'artist8': artists[8],
-        'image8': images[8],
-        'title9': titles[9],
-        'artist9': artists[9],
-        'image9': images[9],
-        })  
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        })
+
+#FRONTEND GETS USER'S PREVIOUS PLAYLIST DATA
+@app.route('/playlist/previous', methods=['GET','POST'])
+def loadPreviousPlaylist():
+    #access and store json package containing user's username
+    data = request.get_json()
+    #need username to specify which user to get the previous playlist of
+    username = data['username']
+    
+    #create 3 variables to store array returns from getBacklog
+    titles, artists, images = db.getBacklog(username)
+
+    #return arrays containing each song information
+    return jsonify({
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        })
 
 #user registration page
 @app.route('/register', methods=['GET','POST'])
@@ -243,6 +221,23 @@ def signupUser():
         'username': username,  
         'password': password
         })
+    
+@app.route('/profile/delete', methods=['GET','POST'])
+def deleteAccount():
+    #grab json package containing username
+    data = request.get_json()
+    
+    #store username
+    username = data['username']
+    
+    #delete all instances of the user from database
+    User.deleteUser(username)
+    
+    #return success status
+    return jsonify({
+        'success': True
+    })
+    
 
 if __name__=='__main__':
     app.run(debug=True)

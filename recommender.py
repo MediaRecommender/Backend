@@ -2,12 +2,12 @@ import openai
 import requests
 import db
 
-openai.api_key = "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" #paste in your own api key from this link https://platform.openai.com/api-keys
+openai.api_key = "" #paste in your own api key from this link https://platform.openai.com/api-keys
 secretKey = '884fe27b952884ad8464bedef92a03bd' #paste your own deezer api key https://developers.deezer.com/myapps/
 baseURL = 'https://api.deezer.com/search' #deezer track search 
 
 #generate 10 songs based on an array of genres or prompts
-def genreSongs(username, genreList): 
+def generateGenreSongs(username, genreList): 
   if not genreList:
     return False
   #initialize chatgpt model and response formatting
@@ -41,6 +41,14 @@ def genreSongs(username, genreList):
   connection = db.connectDB().connection
   cursor = connection.cursor()
   
+  #delete the user's backlog playlist
+  cursor.execute('DELETE FROM backlog WHERE username = %s;', ([username]))
+  #move the most recent playlist into the backlog
+  cursor.execute('INSERT INTO backlog SELECT * FROM recommendedSongs WHERE username = %s;', ([username]))
+  
+  #clear pre-generated songs belonging to a specific user in recommendedSongs table
+  cursor.execute('DELETE FROM recommendedSongs WHERE username = %s;', ([username]))
+  
   #clear pre-generated songs belonging to a specific user in userGenreSongs table
   cursor.execute('DELETE FROM userGenreSongs WHERE username = %s;', ([username]))
   
@@ -57,7 +65,7 @@ def genreSongs(username, genreList):
   return titles, artists, images
 
 #generate 10 songs given an array of similar songs, UNPREDICTABLE RESULTS WITH ARRY OF PROMPTS
-def recommendMusic(username, userSongs):
+def generatePlaylistSongs(username, userSongs):
   #initialize chatgpt model and response formatting
   response = openai.chat.completions.create(
     model="gpt-3.5-turbo",
@@ -88,9 +96,14 @@ def recommendMusic(username, userSongs):
   connection = db.connectDB().connection
   cursor = connection.cursor()
   
+  #delete the user's backlog playlist
+  cursor.execute('DELETE FROM backlog WHERE username = %s;', ([username]))
+  #move the most recent playlist into the backlog
+  cursor.execute('INSERT INTO backlog SELECT * FROM recommendedSongs WHERE username = %s;', ([username]))
+  
   #clear pre-generated songs belonging to a specific user in recommendedSongs table
   cursor.execute('DELETE FROM recommendedSongs WHERE username = %s;', ([username]))
-  
+
   #add the new songs into the recommendedSongs table, which does not have checked attribute
   for i in range(10):
     query1 = 'INSERT INTO recommendedSongs(username, title, artist, imageURL) VALUES (%s, %s, %s, %s);'

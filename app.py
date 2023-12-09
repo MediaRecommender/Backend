@@ -1,7 +1,8 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
+from user import User
+import db
 import recommender
-import openai
 
 app = Flask(__name__)
     
@@ -13,211 +14,12 @@ app.config['MYSQL_DB'] ='musicrecommender4800'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 
-#testing function for how to index a query result
-#IMPORTANT!, each index in a table is given as a dictionary, access table data from key and value
-def indexFunction(): 
-    #establish connection to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-
-    #run a query 
-    cursor.execute('SELECT * FROM users;')
-    #store query into variable
-    results = cursor.fetchall()
-
-    #close cursor
-    cursor.close()
-
-    return results
-
-def validateUser(username,password):
-    #establish connection to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-    
-    #execute query to select password belonging to username user entered, if it is a registered username
-    cursor.execute('SELECT password FROM users WHERE username LIKE %s', [username])
-    #store query result to variable, which should be a key value pair 
-    queryResult = cursor.fetchone()
-
-    #close cursor
-    cursor.close()
-
-    #if username is registered,
-    if queryResult is not None:
-        print("Query Result:",queryResult)
-        #store the associated password of username to variable
-        registeredPassword = queryResult.get('password')  
-
-        #if the passwords match up, return true
-        if password == registeredPassword:     
-            return True
-        else:
-            #if user entered incorrect password
-            return False
-    #if not registered.
-    else:
-        return False
-    
-def updateCheckedGenres(username, checkedGenresList):
-    #connect to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-
-    #set checked status to false for respective genres in db
-    cursor.execute('UPDATE userGenres SET checked = 0 WHERE username = %s;', [username])
-    
-    #set checked status to true for only for those in checkedGenresList
-    for genre in checkedGenresList:
-        cursor.execute('UPDATE userGenres SET checked = 1 WHERE genre = %s AND username = %s;', ([genre], [username]))
-        print('Checked:', genre)
-        
-    #commit the connection to actually change the table in db
-    connection.commit()
-    #close cursor
-    cursor.close()
-
-def sendCheckedGenres(username):
-    #connect to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-
-    #query for all the genres belonging to user that are checked
-    cursor.execute('SELECT genre FROM userGenres WHERE username = %s AND checked = 1;', [username])
-    
-    #store all the genres that are selected
-    results = cursor.fetchall()
-    
-    #closer cursor
-    cursor.close()
-    
-    return results
-
-def updateCheckedSongs(username, checkedSongsList):
-    #create array to store only titles
-    titles = []
-    
-    #append only the title of each song into titles array
-    for song in checkedSongsList:
-        titleAndArtist = song.split(" - ")
-        titles.append(titleAndArtist[0])
-
-    #connect to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-
-    #set checked status to false for respective genres in db
-    cursor.execute('UPDATE userGenreSongs SET checked = 0 WHERE username = %s;', [username])
-    
-    #set checked status to true for only for those in checkedSongsList
-    for song in titles:
-        cursor.execute('UPDATE userGenreSongs SET checked = 1 WHERE title = %s AND username = %s;', ([song], [username]))
-        print('Checked:', song)
-        
-    #commit the connection to actually change the table in db
-    connection.commit()
-    #close cursor
-    cursor.close()
-    
-def sendCheckedSongs(username):
-    #connect to db
-    connection = mysql.connection
-    cursor = connection.cursor()
-
-    #query for all the songs belonging to user that are checked
-    cursor.execute('SELECT title FROM recommendedSongs WHERE username = %s AND checked = 1;', [username])
-    
-    #store all the genres that are selected
-    results = cursor.fetchall()
-    
-    #closer cursor
-    cursor.close()
-    
-    return results
-
-class User:
-  
-    def __init__(self, username, name, password):
-        self.username = username      
-        self.name = name                    
-        self.password = password           
-    
-    def insertUser(self):
-        #intialize all the genres of the user to input into db
-        userGenres = ['Pop', 'Rock', 'Jazz', 'Hip-Hop', 'Indie', 'EDM', 'Country', 'Classical', 'R&B', 'Metal']
-            
-        #connect to db
-        connection = mysql.connection
-        cursor = connection.cursor()
-
-        #query to insert user info into db
-        cursor.execute('INSERT INTO users(username, name, password) VALUES (%s, %s, %s);', ([self.username], [self.name], [self.password]))
-        print('Users table:', self.username, self.name, self.password)
-        
-        #for every genre in the list, add it for the user
-        for genre in userGenres:
-            #add user into the userGenres table with all their genres unchecked by default
-            cursor.execute('INSERT INTO userGenres(username, genre) VALUES (%s, %s);', ([self.username], genre))
-
-        #commit the connection to actually change the table in db
-        connection.commit()
-        #close cursor
-        cursor.close()    
-
-#originally from recommender
-#generate 10 songs given an array of similar songs, UNPREDICTABLE RESULTS WITH ARRY OF PROMPTS
-def recommendMusic(username, userSongs):
-  #initialize chatgpt model and response formatting
-  response = openai.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[
-      {"role": "system", "content": "You are a song recommender that will recommend 10 similar songs when given songs. OUTPUT THE RESULT IN THE FORM OF A PYTHON ARRAY ON ONE LINE. FOLLOW THE FORMAT 'song - artist' for every song but"},
-      {"role": "user", "content": "return this array ['song1 - artist1', 'song2 - artist2', 'song3 - artist3', 'song4 - artist4', 'song5 - artist5', 'song6 - artist6', 'song7 - artist7', 'song8 - artist8', 'song9 - artist9', 'song10 - artist10'] but populate WITH REAL songs and artist similar to: {}. my life depends on this correctly formatted output please provide the formatting correctly.".format(userSongs)} 
-    ])
-  
-  #the result will be a long string formatted like an array, turn the string into actual array
-  playlist = response.choices[0].message.content[2:-2].split("', '")
-  #print array for testing
-  print(playlist)
-
-  #create individual arrays for title, artist, and cover art of a song
-  titles = []
-  artists = []
-  images =[]
-
-  #for every song in the array
-  for song in playlist:
-    #split each array element into title and artist fields and append accordingly
-    fields = song.split(" - ")
-    titles.append(fields[0])
-    artists.append(fields[1])
-    #retrieve cover art using title and artist fields
-    images.append(recommender.getCoverArt(fields[0], fields[1]))
-  
-  connection = mysql.connection
-  cursor = connection.cursor()
-  
-  #clear pre-generated songs belonging to a specific user in recommendedSongs table
-  cursor.execute('DELETE FROM recommendedSongs WHERE username = %s;', ([username]))
-  
-  #add the new songs into the recommendedSongs table, which does not have checked attribute
-  for i in range(10):
-    query1 = 'INSERT INTO recommendedSongs(username, title, artist, imageURL) VALUES (%s, %s, %s, %s);'
-    vals1 = ([username], [titles[i]], [artists[i]], [images[i]])
-    cursor.execute(query1, vals1)
-  
-  #execute connection, close cursor
-  connection.commit()
-  cursor.close()
-  
-  return titles, artists, images
-
 #route for testing
 @app.route('/database') 
 def database():
     checkedGenres = []
-    result1 = indexFunction()
-    result2 = sendCheckedGenres('Mason')
+    result1 = db.indexFunction()
+    result2 = db.sendCheckedGenres('Mason')
     for genre in result2:
         checkedGenres.append(genre['genre'])
         print(genre)
@@ -231,7 +33,7 @@ def home():
     data = request.get_json()
     username = data['username']
     checkedGenres = data['checkedGenres']
-    updateCheckedGenres(username, checkedGenres)
+    db.updateCheckedGenres(username, checkedGenres)
     return jsonify({
         'result':'success'
     })
@@ -251,7 +53,7 @@ def login():
     print("Username entered:",username,"\nPassword entered:",password)
     
     #call db validating method to see if user is registered
-    if validateUser(username, password):
+    if db.validateUser(username, password):
         #registered user, go to home page
         return jsonify({
             'success': True, 
@@ -262,145 +64,127 @@ def login():
             'success': False, 
             })
 
-#page for user to select genres they are interested in 
-#sends frontend checked genres to preserve previous survey answers
-@app.route('/survey', methods = ['GET', 'POST']) 
-def survey():
+#FRONTEND GETS USER'S GENRE SURVEY DATA
+#sends frontend genres that the user checked
+@app.route('/genreSurvey', methods = ['GET', 'POST']) 
+def loadGenreSurvey():
     #access and store json package containing genres array
     data = request.get_json()
-    #need username to specify which user to make songs for
+    #need username to specify which user to get genre survey data from
     username = data['username']
     
-    #create array to return list of user's checked genres in survey
-    checkedGenres = []
-    
     #use db function to get user's checked genres and store the query into variable 
-    query = sendCheckedGenres(username)
+    checkedGenres = db.sendCheckedGenres(username)
     
-    #append each genre into array
-    for genre in query:
-        checkedGenres.append(genre['genre'])
-        print(genre)
-
-    #return genre array in json package
+    #return checked genres array in json package
     return jsonify({
         'checkedGenres': checkedGenres
     })
 
-#page for the user to select songs based off genres they selected on survey page
-#updates checked genres in db right after taking the survey and going to survey results page
-@app.route('/surveyResults', methods=['GET', 'POST']) #CHECK IF USERNAME ENTRIES ARE IN USERGENRESONGS, IF THEY ARE SKIP THE GENRESONG FUNCTION
-
-def surveyResults():
-    #access and store json package containing genres array
+#FRONTEND SENDS USER'S GENRE SURVEY DATA
+#updates newly checked genres and creates genre songs in db right after user submits the survey 
+@app.route('/genreSurvey/submit', methods=['GET', 'POST']) 
+def submitGenreSurvey():
+    #access and store json package 
     data = request.get_json()
-    #need username to specify which user to make songs for
+    #need username to specify which user to update genre survey data for
     username = data['username']
     #get list of genres user checked 
     checkedGenres = data['checkedGenres']
     
-    #return false if user did not check any genres, hence array will be empty
+    #if the user did not check any genres, hence the array is empty
     if not checkedGenres:
         return jsonify({
-            'success':False
-        })
+            'success': False,
+            'message': '{} did not check any genres on the survey.'.format(username)
+            })
         
     #update user's checked genres in db
-    updateCheckedGenres(username, checkedGenres)
+    db.updateCheckedGenres(username, checkedGenres)
+    #generate genre songs in the database for username
+    recommender.generateGenreSongs(username, checkedGenres)
     
-    #save returned arrays from genreSongs function
-    titles, artists, images = recommender.genreSongs(username, checkedGenres)
-    
-    #return 10 songs in json package
+    #return success status
     return jsonify({
-        'title0': titles[0],
-        'artist0': artists[0],
-        'image0': images[0],
-        'title1': titles[1],
-        'artist1': artists[1],
-        'image1': images[1],
-        'title2': titles[2],
-        'artist2': artists[2],
-        'image2': images[2],
-        'title3': titles[3],
-        'artist3': artists[3],
-        'image3': images[3],
-        'title4': titles[4],
-        'artist4': artists[4],
-        'image4': images[4],
-        'title5': titles[5],
-        'artist5': artists[5],
-        'image5': images[5],
-        'title6': titles[6],
-        'artist6': artists[6],
-        'image6': images[6],
-        'title7': titles[7],
-        'artist7': artists[7],
-        'image7': images[7],
-        'title8': titles[8],
-        'artist8': artists[8],
-        'image8': images[8],
-        'title9': titles[9],
-        'artist9': artists[9],
-        'image9': images[9],
+        'success': True,
+        'message': 'Newly checked genres and generated genre songs have been updated for {}'.format(username)
+        })
+    
+#FRONTEND GETS USER'S GENRE SONGS SURVEY DATA
+#sends frontend all the user's genre songs along with their respective checked status'
+@app.route('/genreSongs', methods=['GET', 'POST']) 
+def loadGenreSongsSurvey():
+    #access and store json package 
+    data = request.get_json()
+    #need username to specify which user to load genre songs for
+    username = data['username']
+    
+    #create 4 variables to store array returns from getBacklog
+    titles, artists, images, checked = db.sendGenreSongs(username)
+
+    #return 10 genre songs, along with respective checked status in json
+    return jsonify({
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        'checked': checked
         })
 
+#FRONTEND SENDS USER'S GENRE SONGS SURVEY DATA
+#updates newly checked genre songs and generates new playlist in db
+@app.route('/genreSongs/submit', methods=['GET', 'POST']) 
+def submitGenreSongsSurvey():
+    #access and store json package 
+    data = request.get_json()
+    #need username to specify which user to update genre songs for
+    username = data['username']
+    #get list of genres songs user checked = ["Get You - Daniel Caesar", "Best Part - Daniel Caesar", "Blinding Lights - The Weekend"]
+    checkedGenreSongs = data['checkedGenreSongs']
     
-#user's final playlist page    
-@app.route('/playlistResults', methods=['GET', 'POST']) 
-def playlistResults():
+    #update the genre songs that the user checked
+    db.updateCheckedGenreSongs(username, checkedGenreSongs)
+    #generate the playlist in the db 
+    recommender.generatePlaylistSongs(username, checkedGenreSongs)
+    
+    return jsonify({
+        'success': True,
+        'message': 'Newly checked genre songs and generated playlist has been updated for {}'.format(username)
+        })
+ 
+#FRONTEND GETS USER'S PLAYLIST DATA
+@app.route('/playlist', methods=['GET', 'POST']) 
+def loadPlaylist():
     #access and store json package containing array of user selected songs from genresSongs
     data = request.get_json()
     #need username to specify which user to make songs for
     username = data['username']
-    #get list of songs user checked 
-    checkedSongs = data['checkedSongs']
     
-    #return false if user did not check any songs, hence array will be empty
-    if not checkedSongs:
-        return jsonify({
-            'success': False
-        })
-        
-    #update user's checked songs in db
-    updateCheckedSongs(username, checkedSongs) #CHECKED SONGS END UP BEING "TITLE - ARTIST" ONLY WORKS WITH "TITLE"
-    
-    #save returned arrays from genreSongs function
-    titles, artists, images = recommender.recommendMusic(username, checkedSongs)
+    titles, artists, images = db.getPlaylist(username)
     
     #return 10 final songs in json package
     return jsonify({
-        'title0': titles[0],
-        'artist0': artists[0],
-        'image0': images[0],
-        'title1': titles[1],
-        'artist1': artists[1],
-        'image1': images[1],
-        'title2': titles[2],
-        'artist2': artists[2],
-        'image2': images[2],
-        'title3': titles[3],
-        'artist3': artists[3],
-        'image3': images[3],
-        'title4': titles[4],
-        'artist4': artists[4],
-        'image4': images[4],
-        'title5': titles[5],
-        'artist5': artists[5],
-        'image5': images[5],
-        'title6': titles[6],
-        'artist6': artists[6],
-        'image6': images[6],
-        'title7': titles[7],
-        'artist7': artists[7],
-        'image7': images[7],
-        'title8': titles[8],
-        'artist8': artists[8],
-        'image8': images[8],
-        'title9': titles[9],
-        'artist9': artists[9],
-        'image9': images[9],
-        })  
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        })
+
+#FRONTEND GETS USER'S PREVIOUS PLAYLIST DATA
+@app.route('/playlist/previous', methods=['GET','POST'])
+def loadPreviousPlaylist():
+    #access and store json package containing user's username
+    data = request.get_json()
+    #need username to specify which user to get the previous playlist of
+    username = data['username']
+    
+    #create 3 variables to store array returns from getBacklog
+    titles, artists, images = db.getBacklog(username)
+
+    #return arrays containing each song information
+    return jsonify({
+        'titles': titles,
+        'artists': artists,
+        'images': images,
+        })
 
 #user registration page
 @app.route('/register', methods=['GET','POST'])
@@ -437,6 +221,23 @@ def signupUser():
         'username': username,  
         'password': password
         })
+    
+@app.route('/profile/delete', methods=['GET','POST'])
+def deleteAccount():
+    #grab json package containing username
+    data = request.get_json()
+    
+    #store username
+    username = data['username']
+    
+    #delete all instances of the user from database
+    User.deleteUser(username)
+    
+    #return success status
+    return jsonify({
+        'success': True
+    })
+    
 
 if __name__=='__main__':
     app.run(debug=True)

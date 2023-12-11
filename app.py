@@ -102,7 +102,9 @@ def submitGenreSurvey():
     #update user's checked genres in db
     db.updateCheckedGenres(username, checkedGenres)
     #generate genre songs in the database for username
-    recommender.generateGenreSongs(username, checkedGenres)
+    flag = recommender.generateGenreSongs(username, checkedGenres)
+    while (not flag):
+        flag = recommender.generateGenreSongs(username, checkedGenres)
     
     #return success status
     return jsonify({
@@ -144,7 +146,9 @@ def submitGenreSongsSurvey():
     #update the genre songs that the user checked
     db.updateCheckedGenreSongs(username, checkedGenreSongs)
     #generate the playlist in the db 
-    recommender.generatePlaylistSongs(username, checkedGenreSongs)
+    flag = recommender.generatePlaylistSongs(username, checkedGenreSongs)
+    while (not flag):
+        flag = recommender.generatePlaylistSongs(username, checkedGenreSongs)
     
     return jsonify({
         'success': True,
